@@ -19,33 +19,41 @@ package org.omnione.did.zkp.datamodel.schema;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
-import java.util.List;
-import java.util.Map;
+public class Namespace {
 
-public class AttributeType {
+	@SerializedName("id")
+	@Expose
+	private String id;
 
-    @SerializedName("namespace")
-    @Expose
-    private Namespace namespace;
+	@SerializedName("name")
+	@Expose
+	private String name;
 
-    @SerializedName("items")
-    @Expose
-    private List<AttributeDef> items;
+	@SerializedName("ref")
+	@Expose
+	private String ref;
 
-    public Namespace getNamespace() {
-        return namespace;
-    }
+	public String getId() {
+		return id;
+	}
 
-    public void setNamespace(Namespace namespace) {
-        this.namespace = namespace;
-    }
+	public void setId(String id) {
+		this.id = id;
+	}
 
-    public List<AttributeDef> getItems() {
-        return items;
-    }
+	public String getName() {
+		return name;
+	}
 
-    public void setItems(List<AttributeDef> items) {
-        this.items = items;
-    }
+	public void setName(String name) {
+		this.name = name;
+	}
 
+	public String getRef() {
+		return ref;
+	}
+
+	public void setRef(String ref) {
+		this.ref = ref;
+	}
 }
