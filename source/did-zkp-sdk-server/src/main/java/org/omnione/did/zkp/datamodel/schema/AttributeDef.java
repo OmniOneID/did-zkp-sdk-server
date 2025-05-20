@@ -25,16 +25,12 @@ import java.util.Map;
 
 public class AttributeDef {
 
-    @SerializedName("label")
     @Expose
     private String label;
-    @SerializedName("caption")
     @Expose
     private String caption;
-    @SerializedName("type")
     @Expose
     private ATTR_TYPE type;
-    @SerializedName("i18n")
     @Expose
     private Map<String, String> i18n;
 

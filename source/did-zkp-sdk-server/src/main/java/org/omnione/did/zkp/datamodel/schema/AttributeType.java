@@ -24,11 +24,11 @@ import java.util.Map;
 
 public class AttributeType {
 
-    @SerializedName("namespace")
+//    @SerializedName("namespace")
     @Expose
     private Namespace namespace;
 
-    @SerializedName("items")
+//    @SerializedName("items")
     @Expose
     private List<AttributeDef> items;
 
