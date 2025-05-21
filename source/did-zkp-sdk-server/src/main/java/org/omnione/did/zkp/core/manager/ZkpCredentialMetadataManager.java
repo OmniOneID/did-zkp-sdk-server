@@ -86,7 +86,7 @@ public class ZkpCredentialMetadataManager {
 
         CredentialDefinition credentialDefinition = new CredentialDefinition();
         credentialDefinition.setSchemaId(schema.getId());
-        credentialDefinition.setId(ZkpIdHelper.generateCredentialDefinitionId(issuerDid, schema.getId(), schema.getTag()));
+        credentialDefinition.setId(ZkpIdHelper.generateCredentialDefinitionId(issuerDid, credentialDefinitionVersion, credentialDefinitionTag));
         credentialDefinition.setType(CredentialType.CL);
         credentialDefinition.setVer(credentialDefinitionVersion);
         credentialDefinition.setPrimaryKey(credentialPrimaryPublicKey);
