@@ -79,4 +79,20 @@ public class ZkpCredentialMetadataManager {
         return credentialDefinition;
     }
 
+    public CredentialDefinition createDefinition(String issuerDid, CredentialSchema schema,
+                                                 CredentialPrimaryPublicKey credentialPrimaryPublicKey,
+                                                 String credentialDefinitionVersion,
+                                                 String credentialDefinitionTag) throws ZkpException {
+
+        CredentialDefinition credentialDefinition = new CredentialDefinition();
+        credentialDefinition.setSchemaId(schema.getId());
+        credentialDefinition.setId(ZkpIdHelper.generateCredentialDefinitionId(issuerDid, schema.getId(), schema.getTag()));
+        credentialDefinition.setType(CredentialType.CL);
+        credentialDefinition.setVer(credentialDefinitionVersion);
+        credentialDefinition.setPrimaryKey(credentialPrimaryPublicKey);
+        credentialDefinition.setTag(credentialDefinitionTag);
+
+        return credentialDefinition;
+    }
+
 }
