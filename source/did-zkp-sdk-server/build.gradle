@@ -5,8 +5,8 @@ plugins {
 group = 'org.omnione.did'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17 
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {
@@ -15,7 +15,7 @@ repositories {
 
 jar {
     archiveBaseName.set('did-zkp-sdk-server')
-    archiveVersion.set('1.0.0')
+    archiveVersion.set('2.0.0')
     archiveClassifier.set('') 
 }
 

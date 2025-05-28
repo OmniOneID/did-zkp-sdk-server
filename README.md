@@ -32,13 +32,13 @@ did-zkp-sdk-server
     │   ├── .gitignore
     │   ├── build
     │   ├── libs
-    │   │   ├── did-crypto-sdk-server-1.0.0.jar
+    │   │   ├── did-crypto-sdk-server-2.0.0.jar
     │   ├── gradlew        
     │   ├── gradlew.bat
     │   ├── settings.gradle
     │   └── src
     └── release
-        └── did-zkp-sdk-server-1.0.0.jar
+        └── did-zkp-sdk-server-2.0.0.jar
 ```
 
 | Name                    | Role                                             |
@@ -75,13 +75,13 @@ group = 'org.omnione.did'
 
 jar {
     archiveBaseName.set('did-zkp-sdk-server') 
-    archiveVersion.set('1.0.0')
+    archiveVersion.set('2.0.0')
     archiveClassifier.set('') 
 }
 
 java {
-    sourceCompatibility = '17'
-    targetCompatibility = '17'
+    sourceCompatibility = '21'
+    targetCompatibility = '21'
 }
 
 dependencies {
@@ -89,7 +89,7 @@ dependencies {
     implementation 'org.hibernate:hibernate-validator:7.0.0.Final'
     implementation 'com.google.code.gson:gson:2.8.9'
     implementation 'org.projectlombok:lombok:1.18.24'
-    implementation files('libs/did-crypto-sdk-server-1.0.0.jar')
+    implementation files('libs/did-crypto-sdk-server-2.0.0.jar')
 
     annotationProcessor 'org.projectlombok:lombok:1.18.24'
 }
@@ -98,7 +98,7 @@ dependencies {
 
 2. Open the `Gradle task` window in your IDE and execute the `build > build` task of the project.
 
-3. Once the build completes, the file `did-zkp-sdk-server-1.0.0.jar` will be created in the `%Zkp sdk repository%/build/libs/` directory.
+3. Once the build completes, the file `did-zkp-sdk-server-2.0.0.jar` will be created in the `%Zkp sdk repository%/build/libs/` directory.
 
 <br>
 
@@ -108,7 +108,7 @@ You can find the library on the [Releases](https://github.com/OmniOneID/did-zkp-
 
 ## Using the ZKP Server SDK
 
-1. Copy the `did-zkp-sdk-server-1.0.0.jar` file to the `libs` folder of your server project.
+1. Copy the `did-zkp-sdk-server-2.0.0.jar` file to the `libs` folder of your server project.
 2. Add the following dependencies to your server project's build.gradle:
 
 ```groovy
@@ -116,8 +116,8 @@ You can find the library on the [Releases](https://github.com/OmniOneID/did-zkp-
     implementation 'org.hibernate:hibernate-validator:7.0.0.Final'
     implementation 'com.google.code.gson:gson:2.8.9'
     implementation 'org.projectlombok:lombok:1.18.24'
-    implementation files('libs/did-zkp-sdk-server-1.0.0.jar')
-    implementation files('libs/did-crypto-sdk-server-1.0.0.jar')
+    implementation files('libs/did-zkp-sdk-server-2.0.0.jar')
+    implementation files('libs/did-crypto-sdk-server-2.0.0.jar')
 
     annotationProcessor 'org.projectlombok:lombok:1.18.24'
 ```
