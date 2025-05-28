@@ -67,7 +67,10 @@ public class AttributeDef {
     }
 
     public enum ATTR_TYPE {
+        @SerializedName("String")
         STRING("String"),
+
+        @SerializedName("Number")
         NUMBER("Number");
 
         private String value;
