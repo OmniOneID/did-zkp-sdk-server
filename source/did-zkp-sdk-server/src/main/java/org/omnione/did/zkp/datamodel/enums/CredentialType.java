@@ -16,14 +16,9 @@
 
 package org.omnione.did.zkp.datamodel.enums;
 
-import com.google.gson.annotations.Expose;
-import com.google.gson.annotations.SerializedName;
-
 public enum CredentialType {
     CL(1);
 
-    @SerializedName("value")
-    @Expose
     private int value;
 
     CredentialType(int value) {
@@ -31,6 +26,6 @@ public enum CredentialType {
     }
 
     public int getValue() {
-        return this.value;
+        return value;
     }
 }

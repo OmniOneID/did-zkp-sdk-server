@@ -65,6 +65,7 @@ public class ZkpCredentialManager {
      * @param credentialValue the attribute values of the credential
      * @param credentialRequest the credential request from the holder
      * @param nonce the nonce used during verification
+     * @param vcId the ID from the VC
      * @return a fully populated Credential object
      * @throws ZkpException if the credential request verification fails
      */
@@ -73,13 +74,14 @@ public class ZkpCredentialManager {
                                                         SignatureCorrectnessProof proof,
                                                         LinkedHashMap<String, AttributeValue> credentialValue,
                                                         CredentialRequest credentialRequest,
-                                                        BigInteger nonce) throws ZkpException {
+                                                        BigInteger nonce,
+                                                        String vcId) throws ZkpException {
         if (!new SignatureUtils().verifyCredentialRequest(credentialDefinition.getValue().getPrimary(),
                 credentialRequest.getBlindedMs(), credentialRequest.getBlindedMsProof(), nonce))
             throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_BIG_NUMBER_COMPARE_FAIL,"verify credentialRequest fail in createCredential");
 
         Credential credential = new Credential();
-        credential.setCredentialId(UUID.randomUUID().toString());
+        credential.setCredentialId(vcId);
         credential.setCredDefId(credentialDefinition.getId());
         credential.setSchemaId(credentialDefinition.getSchemaId());
         credential.setRevRegDefId(null);

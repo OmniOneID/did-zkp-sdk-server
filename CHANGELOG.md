@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.0 (2025-04-28)
+## v2.0.0 (2025-04-28)
 
 ### 🚀 New Features
 - ZKP Credential Schema Generation
