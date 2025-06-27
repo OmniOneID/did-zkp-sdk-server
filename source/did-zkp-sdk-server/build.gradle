@@ -1,0 +1,32 @@
+plugins {
+	id 'java'
+}
+
+group = 'org.omnione.did'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+repositories {
+    mavenCentral()
+}
+
+jar {
+    archiveBaseName.set('did-zkp-sdk-server')
+    archiveVersion.set('2.0.0')
+    archiveClassifier.set('') 
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.8.9'
+    implementation 'org.projectlombok:lombok:1.18.24'
+    implementation 'org.hibernate:hibernate-validator:7.0.0.Final'
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+    implementation fileTree(dir: "libs", includes: ["*"])
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
