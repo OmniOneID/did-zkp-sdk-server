@@ -26,6 +26,7 @@ import org.omnione.did.zkp.crypto.keypair.CredentialPrimaryPublicKey;
 import org.omnione.did.zkp.crypto.util.BigIntegerUtil;
 import org.omnione.did.zkp.datamodel.util.GsonWrapper;
 import org.omnione.did.zkp.datamodel.definition.CredentialDefinition;
+import org.omnione.did.zkp.datamodel.enums.PredicateType;
 import org.omnione.did.zkp.datamodel.proof.*;
 import org.omnione.did.zkp.datamodel.proof.verifyparam.ProofVerifyParam;
 import org.omnione.did.zkp.datamodel.proofrequest.AttributeInfo;
@@ -39,6 +40,10 @@ import java.math.BigInteger;
 import java.util.*;
 
 public class ProofVerifier {
+
+    private static final String SUB_PROOF_INDEX = "subProofIndex";
+    private static final String RESTRICTION_CRED_DEF_ID = "credDefId";
+    private static final String RESTRICTION_SCHEMA_ID = "schemaId";
 
     private static Vector<BigInteger> _verify_ne_predicate(CredentialPrimaryPublicKey p_pub_key,
                                                            PrimaryPredicateInequalityProof proof, BigInteger c_hash) throws ZkpException {
@@ -131,54 +136,182 @@ public class ProofVerifier {
             if (attrSet.contains(entry.getAttrName()) == false)
                 throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Credential doesn't contain attribute requested in predicate");
         }
+    }
 
-        Set<String> proofRequestKeySet = new HashSet<String>();
-        Map<String, AttributeInfo> requestedAttributes = proofRequest.getRequestedAttributes();
-        Map<String, PredicateInfo> predicateAttributes = proofRequest.getRequestedPredicates();
-        for (String key: requestedAttributes.keySet()) {
-            if (requestedAttributes.get(key).getRestrictions().size() > 0) {
-                proofRequestKeySet.add(key);
+    private static void checkProofStructure(Proof proof) throws ZkpException {
+        if (proof.getProofs() == null || proof.getProofs().isEmpty())
+            throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Proof doesn't contain any sub proof");
+
+        if (proof.getIdentifiers() == null || proof.getIdentifiers().size() != proof.getProofs().size())
+            throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Proof identifiers don't correspond to sub proofs");
+
+        if (proof.getRequestedProof() == null || proof.getAggregatedProof() == null)
+            throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_NULL, "check verify [requestedProof or aggregatedProof is null]");
+    }
+
+    /**
+     * 요청한 referent 가 모두 증명(requested_proof)에 있고, 증명의 referent 는 모두 요청한 것인지 체크.
+     * referent 가 가리키는 증명서가 요청의 restrictions 를 만족하는지도 체크
+     **/
+    private static void checkRequestedReferents(ProofRequest proofRequest, Proof proof) throws ZkpException {
+        RequestedProof requestedProof = proof.getRequestedProof();
+        Map<String, AttributeInfo> requestedAttributes = orEmpty(proofRequest.getRequestedAttributes());
+        Map<String, PredicateInfo> requestedPredicates = orEmpty(proofRequest.getRequestedPredicates());
+
+        Map<String, Map<String, String>> revealedAttrs = orEmpty(requestedProof.getRevealedAttrs());
+        Map<String, Map<String, String>> unrevealedAttrs = orEmpty(requestedProof.getUnrevealedAttrs());
+        Map<String, Map<String, String>> predicateAttrs = orEmpty(requestedProof.getPredicates());
+
+        for (String ref : predicateAttrs.keySet()) {
+            if (!requestedPredicates.containsKey(ref))
+                throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, ref + " is not requested in proof request");
+        }
+        for (String ref : revealedAttrs.keySet()) {
+            if (!requestedAttributes.containsKey(ref))
+                throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, ref + " is not requested in proof request");
+            if (unrevealedAttrs.containsKey(ref))
+                throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, ref + " is both revealed and unrevealed in requested proof");
+        }
+        for (String ref : unrevealedAttrs.keySet()) {
+            if (!requestedAttributes.containsKey(ref))
+                throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, ref + " is not requested in proof request");
+        }
+
+        for (Map.Entry<String, PredicateInfo> entry : requestedPredicates.entrySet()) {
+            PredicateType pType = entry.getValue().getPType();
+            if (pType == null || pType == PredicateType.EQ)
+                throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Unsupported predicate type requested in " + entry.getKey());
+
+            int index = getSubProofIndex(entry.getKey(), predicateAttrs.get(entry.getKey()), proof.getProofs().size());
+            checkRestrictions(entry.getKey(), entry.getValue().getRestrictions(), proof.getIdentifiers().get(index));
+        }
+
+        for (Map.Entry<String, AttributeInfo> entry : requestedAttributes.entrySet()) {
+            Map<String, String> ref = revealedAttrs.containsKey(entry.getKey()) ? revealedAttrs.get(entry.getKey()) : unrevealedAttrs.get(entry.getKey());
+
+            int index = getSubProofIndex(entry.getKey(), ref, proof.getProofs().size());
+            checkRestrictions(entry.getKey(), entry.getValue().getRestrictions(), proof.getIdentifiers().get(index));
+        }
+    }
+
+    /**
+     * 비공개로 제출한 요청 속성도 sub proof 의 증명서(스키마)에 있는 속성이어야 한다
+     **/
+    private static void checkUnrevealedAttributes(ProofRequest proofRequest, RequestedProof requestedProof, int index, CredentialSchema cred_schema) throws ZkpException {
+        Map<String, AttributeInfo> requestedAttributes = orEmpty(proofRequest.getRequestedAttributes());
+
+        for (Map.Entry<String, Map<String, String>> entry : orEmpty(requestedProof.getUnrevealedAttrs()).entrySet()) {
+            if (Integer.parseInt(entry.getValue().get(SUB_PROOF_INDEX)) != index)
+                continue;
+
+            if (!cred_schema.getAttrNames().contains(requestedAttributes.get(entry.getKey()).getName()))
+                throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Credential doesn't contain requested attribute");
+        }
+    }
+
+    private static int getSubProofIndex(String referent, Map<String, String> ref, int subProofCount) throws ZkpException {
+        if (ref == null || ref.get(SUB_PROOF_INDEX) == null)
+            throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, referent + " doesn't exist in requested proof");
+
+        int index;
+        try {
+            index = Integer.parseInt(ref.get(SUB_PROOF_INDEX));
+        } catch (NumberFormatException e) {
+            throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Invalid subProofIndex of " + referent);
+        }
+        if (index < 0 || index >= subProofCount)
+            throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Invalid subProofIndex of " + referent);
+        return index;
+    }
+
+    /**
+     * restrictions 가 있으면, 그중 하나의 조건(credDefId, schemaId)이 모두 증명서 identifiers 와 일치해야 한다
+     **/
+    private static void checkRestrictions(String referent, List<Map<String, String>> restrictions, Identifiers identifiers) throws ZkpException {
+        if (restrictions == null || restrictions.isEmpty())
+            return;
+
+        for (Map<String, String> restriction : restrictions) {
+            if (restriction == null || restriction.isEmpty())
+                continue;
+
+            boolean matched = true;
+            for (Map.Entry<String, String> condition : restriction.entrySet()) {
+                String value;
+                if (RESTRICTION_CRED_DEF_ID.equals(condition.getKey()))
+                    value = identifiers.getCredDefId();
+                else if (RESTRICTION_SCHEMA_ID.equals(condition.getKey()))
+                    value = identifiers.getSchemaId();
+                else
+                    value = null;
+
+                if (value == null || !value.equals(condition.getValue())) {
+                    matched = false;
+                    break;
+                }
             }
+            if (matched)
+                return;
+        }
+        throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Credential doesn't satisfy restrictions of " + referent);
+    }
+
+    /**
+     * sub proof 가 요청한 것을 증명했는지 체크.
+     * 공개 속성 집합과 조건(속성, 부등호, 기준값) 목록이 요청과 같아야 하고,
+     * 각 조건 증명의 mj 는 동등성 증명의 같은 속성 값(m[attr])과 같아야 한다
+     **/
+    private static void checkVerifyParamsConsistency(PrimaryProof primaryProof, SubProofRequest sub_proof_request) throws ZkpException {
+        if (primaryProof == null || primaryProof.getEqProof() == null
+                || primaryProof.getEqProof().getRevealedAttrs() == null || primaryProof.getEqProof().getM() == null)
+            throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_NULL, "check verify [primaryProof is null]");
+
+        PrimaryEqualProof eqProof = primaryProof.getEqProof();
+
+        if (!eqProof.getRevealedAttrs().keySet().equals(sub_proof_request.getRevealedAttrs()))
+            throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Proof revealed attributes don't correspond to requested attributes");
+
+        List<String> requestedPredicates = new ArrayList<String>();
+        for (Predicate predicate : sub_proof_request.getPredicates()) {
+            requestedPredicates.add(predicateKey(predicate));
         }
 
-        for (String key: predicateAttributes.keySet()) {
-            if (predicateAttributes.get(key).getRestrictions().size() > 0) {
-                proofRequestKeySet.add(key);
-            }
-        }
-        
-        Set<String> reqProofKeySet = new HashSet<String>();
+        List<String> provedPredicates = new ArrayList<String>();
+        for (PrimaryPredicateInequalityProof neProof : orEmpty(primaryProof.getNeProofs())) {
+            Predicate predicate = neProof.getPredicate();
+            if (predicate == null || predicate.getAttrName() == null || predicate.getPType() == null || predicate.getPType() == PredicateType.EQ)
+                throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Unsupported predicate in proof");
 
-        Map<String, Map<String, String>> revealedAttrs = requestedProof.getRevealedAttrs();
-        for (String revealedKey : revealedAttrs.keySet()) {
-            reqProofKeySet.add(revealedKey);
-        }
+            BigInteger m = eqProof.getM().get(predicate.getAttrName());
+            if (m == null || !m.equals(neProof.getMj()))
+                throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Predicate proof is not bound to credential attribute " + predicate.getAttrName());
 
-        Map<String, Map<String, String>> unrevealedAttrs = requestedProof.getUnrevealedAttrs();
-        for (String unrevealedKey : unrevealedAttrs.keySet()) {
-            reqProofKeySet.add(unrevealedKey);
+            provedPredicates.add(predicateKey(predicate));
         }
 
-        Map<String, Map<String, String>> predicateAttrs = requestedProof.getPredicates();
-        for (String predicateKey : predicateAttrs.keySet()) {
-            reqProofKeySet.add(predicateKey);
-        }
-        System.out.println("requestedProof KeyList: "+GsonWrapper.getGsonPrettyPrinting().toJson(reqProofKeySet));
-        /**
-         * 사용자가 선택한 데이터(requested_proof in proof)가 proofRequest 의 조건에 만족하는지 체크
-         **/
+        Collections.sort(requestedPredicates);
+        Collections.sort(provedPredicates);
+        if (!requestedPredicates.equals(provedPredicates))
+            throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, "Proof predicates don't correspond to requested predicates");
+    }
 
-//        for (String ref : proofRequestKeySet) {
-//            try {
-//                if (!reqProofKeySet.contains(ref))
-//                    throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, ref + " doesn't exist in requested proof");
-//            } catch (IOException e) {
-//                throw new ZkpException(ZkpErrorCode.ERR_CODE_ZKP_VERIFIER_NOT_SATISFIED_ATTRIBUTE_IN_SUB_PROOF, ref + " doesn't exist in requested proof");
-//            }
-//        }
+    // Predicate 에 equals/hashCode 가 없어 필드 값으로 비교한다
+    private static String predicateKey(Predicate predicate) {
+        return predicate.getAttrName() + "|" + predicate.getPType() + "|" + predicate.getPValue();
+    }
+
+    private static <K, V> Map<K, V> orEmpty(Map<K, V> map) {
+        return map == null ? Collections.<K, V>emptyMap() : map;
+    }
+
+    private static <T> List<T> orEmpty(List<T> list) {
+        return list == null ? Collections.<T>emptyList() : list;
     }
 
     public static boolean verify(ProofRequest proofRequest, Proof proof, List<ProofVerifyParam> proofVerifyParams, BigInteger nonce) throws ZkpException {
+
+        checkProofStructure(proof);
+        checkRequestedReferents(proofRequest, proof);
 
         ChallengeBuilder builder = new ChallengeBuilder();
 
@@ -221,6 +354,8 @@ public class ProofVerifier {
             System.out.println("verify subProofRequest: "+GsonWrapper.getGsonPrettyPrinting().toJson(subProofRequest));
 
             checkAddSubProofRequestParamsConsistency(proof.getRequestedProof(), proofRequest, subProofRequest, schema);
+            checkUnrevealedAttributes(proofRequest, proof.getRequestedProof(), i, schema);
+            checkVerifyParamsConsistency(primaryProof, subProofRequest);
 
             Vector<BigInteger> t_hat = _verify_equality(credentialDefinition.getValue().getPrimary(),
                     primaryProof.getEqProof(),
@@ -229,7 +364,7 @@ public class ProofVerifier {
                     nonCredSchema,
                     subProofRequest);
 
-            for (PrimaryPredicateInequalityProof neProof : primaryProof.getNeProofs()) {
+            for (PrimaryPredicateInequalityProof neProof : orEmpty(primaryProof.getNeProofs())) {
                 t_hat.addAll(_verify_ne_predicate(credentialDefinition.getValue().getPrimary(), neProof, proof.getAggregatedProof().getcHash()));
             }
 

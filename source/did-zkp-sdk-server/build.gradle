@@ -15,7 +15,7 @@ repositories {
 
 jar {
     archiveBaseName.set('did-zkp-sdk-server')
-    archiveVersion.set('2.0.0')
+    archiveVersion.set('2.0.1')
     archiveClassifier.set('') 
 }
 
